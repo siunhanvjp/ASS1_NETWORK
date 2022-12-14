@@ -163,8 +163,9 @@ def clientLogIn(sck):
     sck.sendall(str(accepted).encode(FORMAT))
     
     client_listen_host = sck.recv(1024).decode(FORMAT)
-    
+    print(client_listen_host)
     client_listen_port = sck.recv(1024).decode(FORMAT)
+    print(client_listen_port)
     db, cursor=ConnectToDB()
     cursor.execute("update user set conn_ip = %s, conn_port = %s where username = %s", (client_listen_host, client_listen_port, user))
     db.commit()
@@ -369,7 +370,20 @@ def clientSearch(sck):
         sck.sendall(conn_port.encode(FORMAT))
         
         
-        
+def RegisterIP(conn, addr):
+    
+    conn.sendall("begin_register".encode(FORMAT))
+    
+    username = conn.recv(1024).decode(FORMAT)
+    conn.sendall("ok".encode(FORMAT))
+    client_listen_host = conn.recv(1024).decode(FORMAT)
+    conn.sendall("ok".encode(FORMAT))
+    client_listen_port = conn.recv(1024).decode(FORMAT)
+    db, cursor=ConnectToDB()
+    cursor.execute("update user set conn_ip = %s, conn_port = %s where username = %s", (client_listen_host, client_listen_port, username))
+    
+    db.commit()
+    print(f'register ok {username} {client_listen_host} {client_listen_port}')
 
     # for data in match:
     #     data = str(data)
@@ -433,6 +447,9 @@ def handle_client(conn, addr):
 
         elif option == LOGOUT:
             Remove_LiveAccount(conn,addr)
+        
+        elif option == "REGISTER_IP":
+            RegisterIP(conn, addr)
 
         # elif option ==INSERT_NEW_MATCH:
         #     Insert_New_Match(conn)

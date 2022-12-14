@@ -2,9 +2,11 @@ import socket
 import tkinter as tk 
 from tkinter import messagebox
 from tkinter import ttk 
+from tkinter.ttk import *
 import threading
 from datetime import datetime
-
+import errno
+import time
 HOST = "127.0.0.1"
 PORT = 65200
 HEADER = 64
@@ -12,11 +14,10 @@ FORMAT = "utf8"
 DISCONNECT = "x"
 LARGE_FONT = ("verdana", 13,"bold")
 
-LISTEN_HOST = socket.gethostbyname(socket.gethostname())
-listen_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-listen_socket.bind((LISTEN_HOST, 0))
-LISTEN_PORT  = listen_socket.getsockname()[1]
-listen_socket.listen(1)
+
+
+
+
 
 #option
 SIGNUP = "signup"
@@ -35,10 +36,14 @@ INSERT_DETAIL = "insert_detail"
 #GUI intialize
 
 username = []
-#create listen socket on client
-# s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-# s.bind((HOST, PORT)) #fix sau
-# s.listen(1)
+
+LISTEN_HOST = socket.gethostbyname(socket.gethostname())
+listen_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+listen_socket.bind((LISTEN_HOST, 0))
+LISTEN_PORT = listen_socket.getsockname()[1]
+listen_socket.listen(5)
+
+curr_sck = ""
 
 class SoccerNews_App(tk.Tk):
     def __init__(self, *args, **kwargs):
@@ -53,7 +58,8 @@ class SoccerNews_App(tk.Tk):
         
         container.grid_rowconfigure(0, weight=1)
         container.grid_columnconfigure(0, weight=1)
-
+        self.LISTEN_HOST = ""
+        self.LISTEN_PORT = 0
         self.frames = {}
         for F in (StartPage, HomePage,AdminPage):
             frame = F(container, self)
@@ -114,13 +120,14 @@ class SoccerNews_App(tk.Tk):
             print("accepted: "+ accepted)
 
             if accepted == "1":
-                sck.sendall(str(LISTEN_HOST).encode(FORMAT))
-                
-                sck.sendall(str(LISTEN_PORT).encode(FORMAT))
                 
                 if user =="admin":
                     self.showFrame(AdminPage)
                 else:
+                    sck.sendall(LISTEN_HOST.encode(FORMAT))
+                    print("oke")
+                    sck.sendall(str(LISTEN_PORT).encode(FORMAT))
+                    print("oke1")
                     username.append(user)
                     self.showFrame(HomePage)
                 
@@ -186,6 +193,31 @@ class SoccerNews_App(tk.Tk):
                 self.showFrame(StartPage)
         except:
             curFrame.label_notice["text"] = "Error: Server is not responding"
+            
+    # def startServer(self,sck):
+    #     self.LISTEN_HOST = socket.gethostbyname(socket.gethostname())
+    #     self.listen_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    #     self.listen_socket.bind((self.LISTEN_HOST, 0))
+    #     self.LISTEN_PORT = self.listen_socket.getsockname()[1]
+    #     self. listen_socket.listen(1)
+        
+    #     self.registerIP(sck)
+        
+        
+    # def registerIP(self, client):
+    #     print("register...")
+    #     print(self.LISTEN_PORT)
+    #     print(self.LISTEN_HOST)
+    #     option = "REGISTER_IP"
+    #     client.sendall(option.encode(FORMAT))
+    #     msg = client.recv(1024).decode(FORMAT)
+    #     if(msg == "begin_register"):
+    #         if(len(username)>0): client.sendall(username[0].encode(FORMAT))
+    #         msg = client.recv(1024).decode(FORMAT)
+    #         client.sendall(self.LISTEN_HOST.encode(FORMAT))
+    #         msg = client.recv(1024).decode(FORMAT)
+    #         client.sendall(str(self.LISTEN_PORT).encode(FORMAT))
+    #         print("done...")
 
 
 
@@ -279,15 +311,16 @@ def checkEvent(strEven):
 
     return msg 
 
-
 class HomePage(tk.Frame):
     def __init__(self, parent, controller):
         tk.Frame.__init__(self, parent)
         self.configure(bg="bisque2")
         
+        
+        
         label_title = tk.Label(self, text="HOME PAGE", font=LARGE_FONT,fg='#20639b',bg="bisque2")
         button_back = tk.Button(self, text="Log out",bg="#20639b",fg='#f5ea54', command=lambda: controller.logout(self,client))
-        button_list = tk.Button(self, text="List all", bg="#20639b",fg='#f5ea54',command=self.listAll)
+        button_list = tk.Button(self, text="List all", bg="#20639b",fg='#f5ea54',command=self.openChatWindow)
 
         self.entry_search = tk.Entry(self)
         button_search = tk.Button(self, text="Connect",bg="#20639b",fg='#f5ea54', command=self.searchID)
@@ -328,6 +361,9 @@ class HomePage(tk.Frame):
         self.tree_detail.heading("Team", text="Team", anchor='c')
         self.tree_detail.heading("Event", text="Event", anchor='c')
 
+        sThread = threading.Thread(target=self.runListenServer)
+        sThread.daemon = True 
+        sThread.start()
 
         self.label_score.pack(pady=5)
         self.label_time.pack(pady=5)
@@ -352,6 +388,41 @@ class HomePage(tk.Frame):
         
         self.tree.pack(pady=20)
         
+        # checkingThread = threading.Thread(target=checkingConnection)
+        # checkingThread.daemon = True 
+        # checkingThread.start()
+        
+    def handle_p2p_client(self, conn, addr):
+        try:
+            self.openChatWindow(conn)
+        except:
+            print("error")
+     
+    def runListenServer(self):
+        try:
+            print(LISTEN_HOST)
+            print("Waiting for P2P Client")
+
+            while True:
+                print("prepare thread for 1 P2P client")
+                conn, addr = listen_socket.accept()
+                print(conn)
+                print(addr)
+
+                clientThread = threading.Thread(target=self.handle_p2p_client, args=(conn,addr))
+                clientThread.daemon = True 
+                clientThread.start()
+                #handle_client(conn, addr)
+                print("new thread for client created")
+
+            
+        except KeyboardInterrupt:
+            print("error")
+            listen_socket.close()
+        finally:
+            listen_socket.close()
+            print("end")   
+
     
     def recieveMatches(self):
         users = []
@@ -469,6 +540,7 @@ class HomePage(tk.Frame):
                 return
             else:
                 self.label_notice["text"] = "User is online, Connecting..."
+                
                 conn_ip = client.recv(1024).decode(FORMAT)
                 conn_port = client.recv(1024).decode(FORMAT)
                 conn_port = int(conn_port)
@@ -478,14 +550,23 @@ class HomePage(tk.Frame):
                 client_p2p = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 server_address = (conn_ip, conn_port)
                 client_p2p.connect(server_address)
-                tin_nhan = ""
-                while True:
-                    if(tin_nhan == "end"):
-                        print("end conversation")
-                        client_p2p.close()
-                        break
-                    tin_nhan = input("say sth: ")
-                    client_p2p.sendall(tin_nhan.encode(FORMAT))
+                
+                self.openChatWindow(client_p2p)
+                
+                # runPeerThread = threading.Thread(target=handle_p2p_client, args=(client_p2p,conn_ip))
+                # runPeerThread.daemon = True
+                # runPeerThread.start()
+                
+                # curr_sck = client_p2p
+                
+                # print("oke")
+                # handleSendThread = threading.Thread(target=send_p2p_client1, args=(client_p2p,conn_ip))
+                # handleReceiveThread = threading.Thread(target=receive_p2p_client1, args=(client_p2p,conn_ip))
+                # handleSendThread.start()
+                # handleReceiveThread.start()
+                # handleSendThread.join()
+                # handleReceiveThread.join()
+                # print("connection is closed, end thread")
 
         #     x = self.tree_detail.get_children()
         #     for item in x:
@@ -508,8 +589,70 @@ class HomePage(tk.Frame):
         #     self.frame_detail.pack()
         except:
             self.label_notice["text"] = "Error"
+            return "error"
 
-
+    def openChatWindow(self, peer_conn):
+        print(peer_conn)
+        def inputer():
+            msg = chat_box.get()
+            chat_box["text"] = ""
+            if msg == "":
+                label_notice["text"] = "cannot be empty"
+            else:
+                label_notice["text"] = ""
+                
+                data.insert(tk.END, f'You say: {msg}')
+                peer_conn.sendall(msg.encode(FORMAT))
+                chat_box["text"] = ""
+        
+        def receiver():
+            while True:
+                msg =  peer_conn.recv(1024).decode(FORMAT) 
+                data.insert(tk.END, f'Peer say: {msg}')
+            
+        window = tk.Toplevel(self)
+        window.configure(bg="bisque2")
+        label_title = tk.Label(window, text="\n ACTIVE ACCOUNT ON SEVER\n", font=LARGE_FONT,fg='#20639b',bg="bisque2").pack()
+        content =tk.Frame(window)
+        data = tk.Listbox(content, height = 20, 
+                  width = 50, 
+                  bg='floral white',
+                  activestyle = 'dotbox', 
+                  font = "Helvetica",
+                  fg='#20639b')
+        button_send = tk.Button(window,text="SEND",bg="#20639b",fg='floral white', command=inputer)
+        button_back = tk.Button(window, text="QUIT",bg="#20639b",fg='floral white')
+        chat_box = tk.Entry(window)  
+        label_notice = tk.Label(window, text="", bg="bisque2" )
+        
+        
+        button_back.configure(width=10)
+        button_back.pack(pady=2, side='bottom')
+        button_send.configure(width=10)
+        button_send.pack(pady=2, side= 'bottom')
+        label_notice.pack( side = 'bottom')
+        chat_box.pack(pady=2, side= 'bottom')
+        
+        scroll= tk.Scrollbar(content)
+        scroll.pack(side = 'right', fill= 'both')
+        data.config(yscrollcommand = scroll.set)
+        content.pack_configure()
+        scroll.config(command = data.yview)
+        data.pack()
+        
+        data.delete(0, tk.END) 
+        data.insert(tk.END, "Conversation started")
+        
+        runPeerThread = threading.Thread(target=receiver)
+        runPeerThread.daemon = True
+        runPeerThread.start()
+        
+        
+            
+       
+        
+         
+        
 
 class AdminPage(tk.Frame):
     def __init__(self, parent, controller):
@@ -803,39 +946,83 @@ class AdminPage(tk.Frame):
         except:
              self.label_notice["text"] = "Error"
 
-      
-def handle_p2p_client(conn, addr):
-    while True:
-        msg = conn.recv(1024).decode(FORMAT)
-        print(f'Client say: {msg}')
-        if(msg == "end"):
-            conn.close()
-            break
 
-def runServer():
+def send_p2p_client(conn, addr):
     try:
-        print(LISTEN_HOST)
-        print("Waiting for P2P Client")
-
         while True:
-            print("prepare thread for 1 P2P client")
-            conn, addr = listen_socket.accept()
-            print(conn)
-            print(addr)
+            msg = input()
+            conn.sendall(msg.encode(FORMAT))
+            if(msg == "end"):
+                break   
+    except:
+        print("Connection is closed")
+      
+def receive_p2p_client(conn, addr):
+    try:
+        while True:
+            msg = conn.recv(1024).decode(FORMAT)
+            print(f'\nClient say: {msg}')
+            if(msg == "end"):
+                conn.sendall(msg.encode(FORMAT))
+                break      
+    except:
+        print("Connection is closed")
+        
+def send_p2p_client1(conn, addr):
+    try:
+        while True:
+            msg = input()
+            conn.sendall(msg.encode(FORMAT))
+            if(msg == "end"):
+                break   
+    except:
+        print("Connection is closed")
+      
+def receive_p2p_client1(conn, addr):
+    try:
+        while True:
+            msg = conn.recv(1024).decode(FORMAT)
+            print(f'\nClient say: {msg}')
+            if(msg == "end"):
+                conn.sendall(msg.encode(FORMAT))
+                break      
+    except:
+        print("Connection is closed")
+        
+def handle_p2p_client(conn, addr):
+    handleSendThread = threading.Thread(target=send_p2p_client, args=(conn,addr))
+    handleReceiveThread = threading.Thread(target=receive_p2p_client, args=(conn,addr))
+    handleSendThread.start()
+    handleReceiveThread.start()
+    handleSendThread.join()
+    handleReceiveThread.join()
+    conn.close()
+    print("connection is closed, end thread")
 
-            clientThread = threading.Thread(target=handle_p2p_client, args=(conn,addr))
-            clientThread.daemon = True 
-            clientThread.start()
-            #handle_client(conn, addr)
-            print("new thread for client created")
+# def runListenServer():
+#     try:
+#         print(LISTEN_HOST)
+#         print("Waiting for P2P Client")
+
+#         while True:
+#             print("prepare thread for 1 P2P client")
+#             conn, addr = listen_socket.accept()
+#             print(conn)
+#             print(addr)
+
+#             clientThread = threading.Thread(target=handle_p2p_client, args=(conn,addr))
+#             clientThread.daemon = True 
+#             clientThread.start()
+#             #handle_client(conn, addr)
+#             print("new thread for client created")
 
         
-    except KeyboardInterrupt:
-        print("error")
-        listen_socket.close()
-    finally:
-        listen_socket.close()
-        print("end")
+#     except KeyboardInterrupt:
+#         print("error")
+#         listen_socket.close()
+#     finally:
+#         listen_socket.close()
+#         print("end")
     
 
 
@@ -845,12 +1032,10 @@ server_address = (HOST, PORT)
 client.connect(server_address)
 
 #initialize listen server socket
-sThread = threading.Thread(target=runServer)
-sThread.daemon = True 
-sThread.start()
 
-print(LISTEN_HOST)
-print(LISTEN_PORT)
+
+# print(LISTEN_HOST)
+# print(LISTEN_PORT)
 app = SoccerNews_App()
 
 
