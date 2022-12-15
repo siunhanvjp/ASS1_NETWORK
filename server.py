@@ -4,11 +4,11 @@ from tkinter import messagebox
 from tkinter import ttk
 from tkinter import *
 from tkinter.ttk import *
-
+import pickle
 import socket
 import threading
-import pyodbc
 import mysql.connector
+HEADER_LENGTH = 10
 
 LARGE_FONT = ("verdana", 13,"bold")
 
@@ -30,16 +30,40 @@ LOGIN = "login"
 LOGOUT = "logout"
 SEARCH = "search"
 LIST = "listall"
-
+LISTROOM = "listroom"
+LISTFRIEND = "listfriend"
+CONNECT = "connect"
+HOSTROOM = "hostroom"
+DELETEROOM = "removeroom"
+CONNECTROOM = "connectroom"
 
 INSERT_NEW_MATCH = 'insert_a_match'
 UPDATE_SCORE = "upd_score"
 UPDATE_DATETIME = "upd_date_time"
 INSERT_DETAIL = "insert_detail"
+
+Live_Account=[] #store address, port online account
+ID=[] #store online username
+Ad=[]
+room=[]
+
+def get_client_data(server):
+    try:
+        header_length = server.recv(HEADER_LENGTH)
+        message_length = int(header_length.decode(FORMAT).strip())
+        data_res = server.recv(message_length)
+        data_res = pickle.loads(data_res)
+        return data_res
+    except:
+        return 'disconnected'
+
+def send_text(sending_socket, text):
+    sending_socket.sendall(bytes(text,encoding=FORMAT))
+
 #create listen socket
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 s.bind((HOST, PORT))
-s.listen(1)
+s.listen(5)
 
 
 
@@ -52,7 +76,7 @@ def Insert_New_Account(user,password):
 
 def check_clientSignUp(username):
     if username == "admin":
-        return False
+        return 0
     db, cursor=ConnectToDB()
     cursor.execute("select username from user")
     for row in cursor:
@@ -61,12 +85,10 @@ def check_clientSignUp(username):
         parse= parse_check.find("'")
         parse_check= parse_check[:parse]
         if parse_check == username:
-            return False
-    return True
+            return 0
+    return 1
 
-Live_Account=[] #store address, port online account
-ID=[] #store online username
-Ad=[]
+
 
 def Check_LiveAccount(username):
     for row in Live_Account:
@@ -76,17 +98,17 @@ def Check_LiveAccount(username):
             return False
     return True
 
-def Remove_LiveAccount(conn,addr):
-    for row in Live_Account:
-        parse= row.find("-")
-        parse_check=row[:parse]
-        if parse_check== str(addr):
-            parse= row.find("-")
-            Ad.remove(parse_check)
-            username= row[(parse+1):]
-            ID.remove(username)
-            Live_Account.remove(row)
-            conn.sendall("True".encode(FORMAT))
+def Remove_LiveAccount(conn, message):
+    username = message["username"]
+    try:
+        if(username in Live_Account):
+            Live_Account.remove(username)    
+            ID.remove(username) 
+            conn.sendall("REMOVED".encode(FORMAT))
+        print(Live_Account)
+        print(ID)
+    except:
+        conn.sendall("FAIL#REMOVED".encode(FORMAT))
 
        
 def check_clientLogIn(username, password):
@@ -115,14 +137,12 @@ def check_clientLogIn(username, password):
     return 2
 
 
-def clientSignUp(sck, addr):
+def clientSignUp(sck, addr, message):
 
-    user = sck.recv(1024).decode(FORMAT)
+    user = message["username"]
+    pswd = message["password"]
+    
     print("username:--" + user +"--")
-
-    sck.sendall(user.encode(FORMAT))
-
-    pswd = sck.recv(1024).decode(FORMAT)
     print("password:--" + pswd +"--")
 
 
@@ -133,172 +153,47 @@ def clientSignUp(sck, addr):
 
     if accepted:
         Insert_New_Account(user, pswd)
-
         # add client sign up address to live account
-        Ad.append(str(addr))
         ID.append(user)
-        account=str(Ad[Ad.__len__()-1])+"-"+str(ID[ID.__len__()-1])
-        Live_Account.append(account)
+        Live_Account.append(user)
+        db, cursor=ConnectToDB()
+        print(message["ip"])
+        print(message["port"])
+        cursor.execute("update user set conn_ip = %s, conn_port = %s where username = %s", (message["ip"], message["port"], user))
+        db.commit()
 
     print("end-logIn()")
     print("")
 
-def clientLogIn(sck):
-
-    user = sck.recv(1024).decode(FORMAT)
+def clientLogIn(sck, message):
+    user = message["username"]
+    pswd = message["password"]
+    
+    # user = sck.recv(1024).decode(FORMAT)
     print("username:--" + user +"--")
 
-    sck.sendall(user.encode(FORMAT))
+    # sck.sendall(user.encode(FORMAT))
     
-    pswd = sck.recv(1024).decode(FORMAT)
+    # pswd = sck.recv(1024).decode(FORMAT)
     print("password:--" + pswd +"--")
     
     accepted = check_clientLogIn(user, pswd)
+    print("accept:", accepted)
+    sck.send(str(accepted).encode(FORMAT))
+    
     if accepted == 1:
         ID.append(user)
-        account=str(Ad[Ad.__len__()-1])+"-"+str(ID[ID.__len__()-1])
-        Live_Account.append(account)
-    
-    print("accept:", accepted)
-    sck.sendall(str(accepted).encode(FORMAT))
-    
-    client_listen_host = sck.recv(1024).decode(FORMAT)
-    print(client_listen_host)
-    client_listen_port = sck.recv(1024).decode(FORMAT)
-    print(client_listen_port)
-    db, cursor=ConnectToDB()
-    cursor.execute("update user set conn_ip = %s, conn_port = %s where username = %s", (client_listen_host, client_listen_port, user))
-    db.commit()
-    
+        Live_Account.append(user)
+        db, cursor=ConnectToDB()
+        print(message["ip"])
+        print(message["port"])
+        cursor.execute("update user set conn_ip = %s, conn_port = %s where username = %s", (message["ip"], message["port"], user))
+        db.commit()
+        # sck.send("LOGIN#OKE".encode(FORMAT))
+
     print(ID)
     print("end-logIn()")
     print("")
-
-
-# def getMatches():
-#     cursor=ConnectToDB()
-#     cursor.execute("select * from TranDau")
-#     res=[]
-#     for row in cursor:
-#         res.append(row)
-#     return res
-
-# # match : [ID, TeamA, TeamB, Score, Date, Time]
-
-# def Get_ALL_IDs():
-#     cursor=ConnectToDB()
-#     cursor.execute("select MaTD from TranDau")
-#     res=[]
-#     for row in cursor:
-#         parse=str(row)
-#         parse_check =parse[2:]
-#         parse= parse_check.find("'")
-#         parse_check= parse_check[:parse]
-#         res.append(parse_check)
-#     return res
-
-# def Insert_New_Match(sck):
-#     data = ""
-#     match=[]
-#     for i in range(6):
-#         data=sck.recv(1024).decode(FORMAT)
-#         print(data)
-#         sck.sendall(data.encode(FORMAT))
-#         match.append(data)
-#     res= Get_ALL_IDs()
-#     for row in res:
-#         if row==match[0]:
-#             sck.sendall("failed".encode(FORMAT))
-#             return False
-#     try:
-#         cursor=ConnectToDB()
-#         cursor.execute("insert into TranDau(MaTD,DoiA,DoiB,TiSo,NgayThiDau,GioThiDau) values (?,?,?,?,?,?)",
-#         (match[0],match[1],match[2],match[3],match[4],match[5]))
-#         cursor.commit()
-#     except pyodbc.Error:
-#         sck.sendall("failed".encode(FORMAT))
-#         return False
-    
-
-#     sck.sendall("success".encode(FORMAT))
-#     return True
-
-
-# def Update_Score(sck):
-   
-#     match=[]
-#     for i in range(2):
-#         data=sck.recv(1024).decode(FORMAT)
-#         print(data)
-#         sck.sendall(data.encode(FORMAT))
-#         match.append(data)
-    
-#     res=Get_ALL_IDs()
-    
-#     for row in res:
-#         if row == match[0]:
-#             try:
-#                 cursor=ConnectToDB()
-#                 cursor.execute('update TranDau set TiSo=? where MaTD=?',(match[1],match[0]))
-#                 cursor.commit()
-#             except pyodbc.Error:
-#                 sck.sendall("failed".encode(FORMAT))
-#                 return False
-#             sck.sendall("success".encode(FORMAT))
-#             return True
-    
-#     sck.sendall("failed".encode(FORMAT))
-#     return False
-
-# def Update_Date_Time(sck):
-#     match=[]
-#     for i in range(3):
-#         data=sck.recv(1024).decode(FORMAT)
-#         print(data)
-#         sck.sendall(data.encode(FORMAT))
-#         match.append(data)
-    
-#     res= Get_ALL_IDs()
-#     for row in res:
-#         if row == match[0]:
-#             try:
-#                 cursor=ConnectToDB()
-#                 cursor.execute("update TranDau set NgayThiDau=?, GioThiDau=? where MaTD=? ",(match[1],match[2],match[0]))
-#                 cursor.commit()
-#             except pyodbc.Error:
-#                 sck.sendall("failed".encode(FORMAT))
-#                 return False
-#             sck.sendall("success".encode(FORMAT))
-#             return True
-    
-#     sck.sendall("failed".encode(FORMAT))
-#     return False
-
-# def Insert_Detail(sck):
-#     match=[]
-
-#     for i in range(5):
-#         data=sck.recv(1024).decode(FORMAT)
-#         print(data)
-#         sck.sendall(data.encode(FORMAT))
-#         match.append(data)
-    
-#     res= Get_ALL_IDs()
-#     for row in res:
-#         if row==match[0]:
-#             try:
-#                 cursor=ConnectToDB()
-#                 cursor.execute('insert into CT_TranDau(MaTD,TenDoi,SuKien,TenCauThu,ThoiGian) values(?,?,?,?,?)'
-#                 ,(match[0],match[1],match[2],match[3],match[4]))
-#                 cursor.commit()
-#             except pyodbc.Error:
-#                 sck.sendall("failed".encode(FORMAT))
-#                 return False
-#             sck.sendall("success".encode(FORMAT))
-#             return True
-    
-#     sck.sendall("failed".encode(FORMAT))
-#     return False
 
        
 def clientListMatches(sck):
@@ -326,6 +221,7 @@ def findUser(id):
     return False
 
 
+
 def findDetails(id):
     IDs=Get_ALL_IDs()
     for row in IDs:
@@ -339,21 +235,25 @@ def findDetails(id):
             return details
     return False
  
-def clientSearch(sck):
+def clientConn(sck, message):
 
     #receive a match
-    username = sck.recv(1024).decode(FORMAT)
+    username = message["username"]
     
     is_online =  findUser(username)
-    
+    response = {}
     if is_online == False :
-        msg = "nouser"
-        print(msg)
-        sck.sendall(msg.encode(FORMAT))
+        response["reply"] = "nouser"
+        
+        msg = pickle.dumps(response)
+        msg = bytes(f"{len(msg):<{HEADER_LENGTH}}", FORMAT) + msg
+        
+        sck.send(msg)
+        
         return 
     else :
-        msg = "ok"
-        sck.sendall(msg.encode(FORMAT))
+        # msg = "ok"
+        # sck.sendall(msg.encode(FORMAT))
         #gui address voi port cua user nay
         db, cursor=ConnectToDB()
         cursor.execute("select conn_ip from user where username= %s ",(username, ))
@@ -366,49 +266,92 @@ def clientSearch(sck):
         parse_check =parse[2:]
         parse= parse_check.find("'")
         conn_port = parse_check[:parse]
-        sck.sendall(conn_ip.encode(FORMAT))
-        sck.sendall(conn_port.encode(FORMAT))
         
+        response["reply"] = "oke"
+        response["conn_ip"] = conn_ip
+        response["conn_port"] = str(conn_port)
         
-def RegisterIP(conn, addr):
+        msg = pickle.dumps(response)
+        msg = bytes(f"{len(msg):<{HEADER_LENGTH}}", FORMAT) + msg
+        sck.send(msg)
+        
+def addRoom(sck, message):
+    username = message["username"]
     
-    conn.sendall("begin_register".encode(FORMAT))
+    if not any(item["username"] == username for item in room):
+        room_listen_host = message["listen_host"]
+        room_listen_port = message["listen_port"]
+        host_room = {}
+        host_room["username"] = username
+        host_room["listen_host"] = room_listen_host
+        host_room["listen_port"] = room_listen_port
+        room.append(host_room)
+        print(room)
+        sck.sendall("ROOM#CREATED".encode(FORMAT))
+    else:
+        sck.sendall("ROOM#EXISTS".encode(FORMAT))
     
-    username = conn.recv(1024).decode(FORMAT)
-    conn.sendall("ok".encode(FORMAT))
-    client_listen_host = conn.recv(1024).decode(FORMAT)
-    conn.sendall("ok".encode(FORMAT))
-    client_listen_port = conn.recv(1024).decode(FORMAT)
-    db, cursor=ConnectToDB()
-    cursor.execute("update user set conn_ip = %s, conn_port = %s where username = %s", (client_listen_host, client_listen_port, username))
+def removeRoom(sck, message):
+    username = message["username"]
     
-    db.commit()
-    print(f'register ok {username} {client_listen_host} {client_listen_port}')
-
-    # for data in match:
-    #     data = str(data)
-    #     print(data, end=' ')
-    #     sck.sendall(data.encode(FORMAT))
-    #     sck.recv(1024)
-
-    # # receive match details
-    # msg = sck.recv(1024).decode(FORMAT)
-
-    # details = findDetails(id) 
-
-    # for row in details:
-    #     msg = "next"
-    #     sck.sendall(msg.encode(FORMAT))
-
-    #     for data in row:
-    #         data = str(data)
-    #         sck.sendall(data.encode(FORMAT))
-    #         sck.recv(1024)
-
-    # msg = "end"
-    # sck.sendall(msg.encode(FORMAT))
+    if not any(item["username"] == username for item in room):
+        sck.sendall("ROOM#REMOVED".encode(FORMAT))
+    else:
+        room[:] = [d for d in room if d.get('username') != username]
+        sck.sendall("ROOM#REMOVEDS".encode(FORMAT))
 
 
+def connectRoom(sck, message):
+    username = message["username"]
+    
+    is_online = True
+    
+    if not any(item["username"] == username for item in room):
+        is_online = False
+        
+    response = {}
+    if is_online == False :
+        response["reply"] = "noroom"
+        
+        msg = pickle.dumps(response)
+        msg = bytes(f"{len(msg):<{HEADER_LENGTH}}", FORMAT) + msg
+        
+        sck.send(msg)
+        
+        return 
+    else:
+        conn_ip = ""
+        conn_port = 0
+        for item in room:
+            if item['username'] == username:
+                conn_ip = item['listen_host']
+                conn_port = item['listen_port']
+                break
+            else:
+                my_item = None
+        print(conn_ip)
+        print(conn_port)
+        response["reply"] = "oke"
+        response["conn_ip"] = conn_ip
+        response["conn_port"] = str(conn_port)
+        
+        msg = pickle.dumps(response)
+        msg = bytes(f"{len(msg):<{HEADER_LENGTH}}", FORMAT) + msg
+        sck.send(msg)
+    
+def showRoom(sck, message):
+    room_list = []
+    for item in room:
+        room_list.append(item["username"])
+        
+    response = {}
+    response["reply"] = "oke"
+    response["room_online"] = room_list
+    
+    msg = pickle.dumps(response)
+    msg = bytes(f"{len(msg):<{HEADER_LENGTH}}", FORMAT) + msg
+    sck.send(msg)
+    
 # Specify this function before interpreting
 def ConnectToDB():
     server = SEVER_NAME
@@ -427,45 +370,42 @@ def ConnectToDB():
 def handle_client(conn, addr):
 
     while True:
-
-        option = conn.recv(1024).decode(FORMAT)
-
-
-        if option == LOGIN:
-            Ad.append(str(addr))
-            clientLogIn(conn)
+        message = get_client_data(conn)
+        if message == "disconnected":
+            break
+        message["status"] = 1 #mark as read
+        print(message)
         
+        option = message["option"]
+            
+        if option == LOGIN:
+            clientLogIn(conn, message)
+            
         elif option == SIGNUP:
-            clientSignUp(conn, addr)
-
+            clientSignUp(conn, addr, message)
 
         elif option == LIST:
             clientListMatches(conn)
         
-        elif option == SEARCH:
-            clientSearch(conn)
+        elif option == CONNECT:
+            clientConn(conn, message)
 
         elif option == LOGOUT:
-            Remove_LiveAccount(conn,addr)
+            Remove_LiveAccount(conn, message)
+            
+        elif option == HOSTROOM:
+            addRoom(conn, message)
+            
+        elif option == DELETEROOM:
+            removeRoom(conn, message)
+            
+        elif option == CONNECTROOM:
+            connectRoom(conn, message)
         
-        elif option == "REGISTER_IP":
-            RegisterIP(conn, addr)
+        elif option == LISTROOM:
+            showRoom(conn, message)
 
-        # elif option ==INSERT_NEW_MATCH:
-        #     Insert_New_Match(conn)
-        
-        # elif option == UPDATE_SCORE:
-        #     Update_Score(conn)
-        
-        # elif option == UPDATE_DATETIME:
-        #     Update_Date_Time(conn)
-
-        # elif option == INSERT_DETAIL:
-        #     Insert_Detail(conn)
-
-
-    Remove_LiveAccount(conn,addr)
-    conn.close()
+    print(Live_Account)
     print("end-thread")
 
 
@@ -483,8 +423,7 @@ def runServer():
             clientThread = threading.Thread(target=handle_client, args=(conn,addr))
             clientThread.daemon = True 
             clientThread.start()
-        
-            
+
             #handle_client(conn, addr)
             print("new thread for client created")
 
