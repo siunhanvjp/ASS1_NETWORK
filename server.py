@@ -168,13 +168,7 @@ def clientSignUp(sck, addr, message):
 def clientLogIn(sck, message):
     user = message["username"]
     pswd = message["password"]
-    
-    # user = sck.recv(1024).decode(FORMAT)
     print("username:--" + user +"--")
-
-    # sck.sendall(user.encode(FORMAT))
-    
-    # pswd = sck.recv(1024).decode(FORMAT)
     print("password:--" + pswd +"--")
     
     accepted = check_clientLogIn(user, pswd)
@@ -237,9 +231,10 @@ def findDetails(id):
  
 def clientConn(sck, message):
 
-    #receive a match
-    username = message["username"]
+    #connect request from sender to receiver (username)
     
+    username = message["username"]
+    sender = message["sender"]
     is_online =  findUser(username)
     response = {}
     if is_online == False :
@@ -252,8 +247,7 @@ def clientConn(sck, message):
         
         return 
     else :
-        # msg = "ok"
-        # sck.sendall(msg.encode(FORMAT))
+        
         #gui address voi port cua user nay
         db, cursor=ConnectToDB()
         cursor.execute("select conn_ip from user where username= %s ",(username, ))
@@ -266,7 +260,20 @@ def clientConn(sck, message):
         parse_check =parse[2:]
         parse= parse_check.find("'")
         conn_port = parse_check[:parse]
+        #check friend khi connect
+        cursor.execute("select * from friend_list where username=(%s) and user_friend=(%s)", (sender, username ))
+        is_friend = False
         
+        for row in cursor:
+            is_friend = True
+        #add friend khi connect
+        if not(is_friend):
+            cursor.execute( "insert into friend_list(username,user_friend) values(%s,%s);",(sender,username))
+            db.commit()
+            cursor.execute( "insert into friend_list(username,user_friend) values(%s,%s);",(username,sender))
+            db.commit()
+
+        #response
         response["reply"] = "oke"
         response["conn_ip"] = conn_ip
         response["conn_port"] = str(conn_port)
@@ -352,6 +359,35 @@ def showRoom(sck, message):
     msg = bytes(f"{len(msg):<{HEADER_LENGTH}}", FORMAT) + msg
     sck.send(msg)
     
+def showFriend(sck, message):
+    
+    user = message["username"]
+    friend_list = []
+    db, cursor=ConnectToDB()
+    cursor.execute("select user_friend from friend_list where username=(%s) ",(user, ))
+    for row in cursor:
+        parse=str(row)
+        parse_check =parse[2:]
+        parse= parse_check.find("'")
+        res= parse_check[:parse]
+        friend_list.append(res)
+    print(friend_list)
+    online_friend_list = []
+    
+    for friend in friend_list:
+        if friend in Live_Account:
+            online_friend_list.append(friend)
+    
+    print(online_friend_list)
+    
+    response = {}
+    response["reply"] = "oke"
+    response["friend_online"] = online_friend_list
+    
+    msg = pickle.dumps(response)
+    msg = bytes(f"{len(msg):<{HEADER_LENGTH}}", FORMAT) + msg
+    sck.send(msg)
+    
 # Specify this function before interpreting
 def ConnectToDB():
     server = SEVER_NAME
@@ -405,6 +441,8 @@ def handle_client(conn, addr):
         elif option == LISTROOM:
             showRoom(conn, message)
 
+        elif option == LISTFRIEND:
+            showFriend(conn, message)
     print(Live_Account)
     print("end-thread")
 

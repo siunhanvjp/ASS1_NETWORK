@@ -68,15 +68,18 @@ LISTEN_PORT = listen_socket.getsockname()[1]
 listen_socket.listen(5)
 
 def check_delete_room():
-    if(len(username) > 0):
-        message = {}
-        message["option"] = DELETEROOM
-        message["username"] = username[0]
-        msg = pickle.dumps(message)
-        msg = bytes(f"{len(msg):<{HEADER_LENGTH}}", FORMAT) + msg
-    
-        client.send(msg)
-        msg = client.recv(1024).decode(FORMAT)
+    try:
+        if(len(username) > 0):
+            message = {}
+            message["option"] = DELETEROOM
+            message["username"] = username[0]
+            msg = pickle.dumps(message)
+            msg = bytes(f"{len(msg):<{HEADER_LENGTH}}", FORMAT) + msg
+        
+            client.send(msg)
+            msg = client.recv(1024).decode(FORMAT)
+    except:
+        print("SERVER DISCONNECTED")
 
 class SoccerNews_App(tk.Tk):
     def __init__(self, *args, **kwargs):
@@ -276,7 +279,7 @@ class HomePage(tk.Frame):
         
         label_title = tk.Label(self, text="HOME PAGE", font=LARGE_FONT,fg='#20639b',bg="bisque2")
         button_back = tk.Button(self, text="Log out",bg="#20639b",fg='#f5ea54', command=lambda: controller.logout(self,client))
-        button_list = tk.Button(self, text="List Online Friend", bg="#20639b",fg='#f5ea54',command=self.openChatWindow)
+        button_list = tk.Button(self, text="List Online Friend", bg="#20639b",fg='#f5ea54',command=self.listFriend)
         button_list_room = tk.Button(self, text="List Online Room",bg="#20639b",fg='#f5ea54', command = self.listRoom)
         button_connect_room = tk.Button(self, text="Connect Room",bg="#20639b",fg='#f5ea54', command=self.connectChatRoom)
         button_host_room = tk.Button(self, text="Host a Room",bg="#20639b",fg='#f5ea54', command=self.hostChatRoom)
@@ -311,21 +314,6 @@ class HomePage(tk.Frame):
         self.label_time = tk.Label(self.frame_detail,bg="steelblue1", text="", font=LARGE_FONT)
         self.label_status = tk.Label(self.frame_detail,bg="steelblue1", text="", font=LARGE_FONT)
 
-        self.tree_detail = ttk.Treeview(self.frame_detail)
-        self.tree_detail["column"] = ("Time", "Player", "Team", "Event")
-        
-        self.tree_detail.column("#0", width=0, stretch=tk.NO)
-        self.tree_detail.column("Time", anchor='c', width=50)
-        self.tree_detail.column("Player", anchor='c', width=200)
-        self.tree_detail.column("Team", anchor='c', width=200)
-        self.tree_detail.column("Event", anchor='c', width=180)
-
-        self.tree_detail.heading("0", text="", anchor='c')
-        self.tree_detail.heading("Time", text="Time", anchor='c')
-        self.tree_detail.heading("Player", text="Player", anchor='c')
-        self.tree_detail.heading("Team", text="Team", anchor='c')
-        self.tree_detail.heading("Event", text="Event", anchor='c')
-
         sThread = threading.Thread(target=self.runListenServer)
         sThread.daemon = True 
         sThread.start()
@@ -333,7 +321,6 @@ class HomePage(tk.Frame):
         self.label_score.pack(pady=5)
         self.label_time.pack(pady=5)
         self.label_status.pack(pady=5)
-        self.tree_detail.pack()
         
 
 
@@ -342,14 +329,14 @@ class HomePage(tk.Frame):
         self.tree = ttk.Treeview(self.frame_list)
 
         
-        self.tree["column"] = ("Username")
+        self.tree["column"] = ("Name")
         
         
         self.tree.column("#0", width=0, stretch=tk.NO)
-        self.tree.column("Username",  anchor='c', width=240)
+        self.tree.column("Name",  anchor='c', width=240)
 
         self.tree.heading("0", text="")
-        self.tree.heading("Username",  anchor='c', text="Username")
+        self.tree.heading("Name",  anchor='c', text="Name")
         
         self.tree.pack(pady=20)
         
@@ -357,32 +344,72 @@ class HomePage(tk.Frame):
         # checkingThread.daemon = True 
         # checkingThread.start()
     
-    
-    
-    def listRoom(self):
+    def listFriend(self):
         try:
             self.frame_detail.pack_forget()
-
-            option = LISTROOM
-            client.sendall(option.encode(FORMAT))
             
-            users = self.recieveMatches()
+            message = {}
+            message["option"] = LISTFRIEND
+            message["username"] = username[0]
+            
+            msg = pickle.dumps(message)
+            msg = bytes(f"{len(msg):<{HEADER_LENGTH}}", FORMAT) + msg
+            
+            client.send(msg)
+            
+            response = get_client_data(client)
+            print(response)
+            
+            friends = response["friend_online"]
             
             x = self.tree.get_children()
             for item in x:
                 self.tree.delete(item)
-            print(users)
+            print(friends)
             i = 0
-            for m in users:
-                print(m)
+            for friend in friends:
+                print(friend)
                 self.tree.insert(parent="", index="end", iid=i, 
-                        values = (m,'alo') )
+                        values = (friend,) )
                 
                 i += 1
 
             self.frame_list.pack(pady=10)
         except:
-            self.label_notice["text"] = "Error"
+            self.label_notice["text"] = "SERVER DISCONNECTED"
+    
+    def listRoom(self):
+        try:
+            self.frame_detail.pack_forget()
+            
+            message = {}
+            message["option"] = LISTROOM
+            
+            msg = pickle.dumps(message)
+            msg = bytes(f"{len(msg):<{HEADER_LENGTH}}", FORMAT) + msg
+            
+            client.send(msg)
+            
+            response = get_client_data(client)
+            print(response)
+            
+            rooms = response["room_online"]
+            
+            x = self.tree.get_children()
+            for item in x:
+                self.tree.delete(item)
+            print(rooms)
+            i = 0
+            for room in rooms:
+                print(room)
+                self.tree.insert(parent="", index="end", iid=i, 
+                        values = (room,) )
+                
+                i += 1
+
+            self.frame_list.pack(pady=10)
+        except:
+            self.label_notice["text"] = "SERVER DISCONNECTED"
     
     def connect1v1(self, conn, message):
         if messagebox.askokcancel("Connection", "Do you want to connect?"):    
@@ -613,80 +640,45 @@ class HomePage(tk.Frame):
             self.frame_list.pack(pady=10)
         except:
             self.label_notice["text"] = "Error"
-            
-
-
-    def receive1Match(self):
-              
-        data = ""
-        match = []
-
-        for i in range(6):
-            data = client.recv(1024).decode(FORMAT)
-            client.sendall(data.encode(FORMAT))
-            match.append(data) 
-
-        return match
-
-    
-
-    def receiveDetails(self):
-        option = "details"
-        client.sendall(option.encode(FORMAT))
-
-        row = []
-        details = []
-        data = ""
-
-        while True:
-            data = client.recv(1024).decode(FORMAT)
-            if (data == "end"):
-                break
-            
-            for i in range(5):
-                data = client.recv(1024).decode(FORMAT)
-                client.sendall(data.encode(FORMAT)) 
-                row.append(data)
-
-            details.append(row)
-            row = []
         
-        return details
+
 
     def hostChatRoom(self): #register room with server
          #create new listen socket for chat room
-        room_listen_host = socket.gethostbyname(socket.gethostname())
-        room_listen_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        room_listen_socket.bind((room_listen_host, 0))
-        room_listen_port = room_listen_socket.getsockname()[1]
-        room_listen_socket.listen(5)
-        
-        print(room_listen_host)
-        print(room_listen_port)
-        
-        message = {}
-        message["option"] = HOSTROOM
-        message["username"] = username[0]
-        message["listen_host"] = room_listen_host
-        message["listen_port"] = room_listen_port
-        
-        
-        msg = pickle.dumps(message)
-        msg = bytes(f"{len(msg):<{HEADER_LENGTH}}", FORMAT) + msg
-        
-        client.send(msg)
-        
-        msg = client.recv(1024).decode(FORMAT)
-        print(msg)
-        if(msg == "ROOM#EXISTS"):
-            room_listen_socket.close()
-            self.label_notice["text"] = "Cannot create, already host a room"
-            return
+        try:
+            room_listen_host = socket.gethostbyname(socket.gethostname())
+            room_listen_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            room_listen_socket.bind((room_listen_host, 0))
+            room_listen_port = room_listen_socket.getsockname()[1]
+            room_listen_socket.listen(5)
+            
+            print(room_listen_host)
+            print(room_listen_port)
+            
+            message = {}
+            message["option"] = HOSTROOM
+            message["username"] = username[0]
+            message["listen_host"] = room_listen_host
+            message["listen_port"] = room_listen_port
+            
+            
+            msg = pickle.dumps(message)
+            msg = bytes(f"{len(msg):<{HEADER_LENGTH}}", FORMAT) + msg
+            
+            client.send(msg)
+            
+            msg = client.recv(1024).decode(FORMAT)
+            print(msg)
+            if(msg == "ROOM#EXISTS"):
+                room_listen_socket.close()
+                self.label_notice["text"] = "Cannot create, already host a room"
+                return
 
-        roomThread = threading.Thread(target=self.openHostRoomWindow, args=(room_listen_socket,))
-        roomThread.daemon = True 
-        roomThread.start()
-        
+            roomThread = threading.Thread(target=self.openHostRoomWindow, args=(room_listen_socket,))
+            roomThread.daemon = True 
+            roomThread.start()
+        except:
+            self.label_notice["text"] = "SERVER DISCONNECTED"
         
     
              
@@ -815,6 +807,7 @@ class HomePage(tk.Frame):
             except:
                 host_socket.close()
                 print("CLOSE ROOM !!!")
+                break
             
         
         
@@ -822,71 +815,72 @@ class HomePage(tk.Frame):
         
     
     def connectChat(self):
-        # try:
-        self.label_notice["text"] = ""
-        id = self.entry_search.get()    
-        print(username)
-        if (id == ""):
-            self.label_notice["text"] = "Field cannot be empty"
-            return
-        if(id in username):
-            self.label_notice["text"] = "Cannot connect to urself"
-            return
-        if( id in is_connect):
-            self.label_notice["text"] = "Already has a connection to this account"
-            return
-        
-        message = {}
-        message["option"] = CONNECT
-        message["username"] = id
-        
-        msg = pickle.dumps(message)
-        msg = bytes(f"{len(msg):<{HEADER_LENGTH}}", FORMAT) + msg
-        
-        client.send(msg)
-        
-        # self.frame_list.pack_forget()
-
-        response = get_client_data(client)
-        print(response)
-        reply = response["reply"]
-        
-        if (reply == "nouser"):
-            print("user offline or dont exist")
-            self.label_notice["text"] = "User offline or dont exist"
-            return
-        else:
-            self.label_notice["text"] = "User is online, Connecting..."
-            
-            conn_ip = response["conn_ip"]
-            conn_port =int(response["conn_port"])
-            
-            print(conn_ip)
-            print(conn_port)
-                
-            client_p2p = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            server_address = (conn_ip, conn_port)
-            client_p2p.connect(server_address)
+        try:
+            self.label_notice["text"] = ""
+            id = self.entry_search.get()    
+            print(username)
+            if (id == ""):
+                self.label_notice["text"] = "Field cannot be empty"
+                return
+            if(id in username):
+                self.label_notice["text"] = "Cannot connect to urself"
+                return
+            if( id in is_connect):
+                self.label_notice["text"] = "Already has a connection to this account"
+                return
             
             message = {}
-            message["option"] = CHAT
+            message["option"] = CONNECT
+            message["username"] = id
             message["sender"] = username[0]
-            message["receiver"] = id
             
             msg = pickle.dumps(message)
             msg = bytes(f"{len(msg):<{HEADER_LENGTH}}", FORMAT) + msg
             
-            client_p2p.send(msg)
+            client.send(msg)
             
+            # self.frame_list.pack_forget()
+
+            response = get_client_data(client)
+            print(response)
+            reply = response["reply"]
             
-            conn_response = client_p2p.recv(1024).decode(FORMAT)
-            print(conn_response)
-            if(conn_response == "OK#CONNECT"):
-                user_receiver = id
-                self.openChatWindow(client_p2p, user_receiver)
-        # except:
-        #     self.label_notice["text"] = "Error"
-        #     return "error"
+            if (reply == "nouser"):
+                print("user offline or dont exist")
+                self.label_notice["text"] = "User offline or dont exist"
+                return
+            else:
+                self.label_notice["text"] = "User is online, Connecting..."
+                
+                conn_ip = response["conn_ip"]
+                conn_port =int(response["conn_port"])
+                
+                print(conn_ip)
+                print(conn_port)
+                    
+                client_p2p = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                server_address = (conn_ip, conn_port)
+                client_p2p.connect(server_address)
+                
+                message = {}
+                message["option"] = CHAT
+                message["sender"] = username[0]
+                message["receiver"] = id
+                
+                msg = pickle.dumps(message)
+                msg = bytes(f"{len(msg):<{HEADER_LENGTH}}", FORMAT) + msg
+                
+                client_p2p.send(msg)
+                
+                
+                conn_response = client_p2p.recv(1024).decode(FORMAT)
+                print(conn_response)
+                if(conn_response == "OK#CONNECT"):
+                    user_receiver = id
+                    self.openChatWindow(client_p2p, user_receiver)
+        except:
+            self.label_notice["text"] = "SERVER DISCONNECTED"
+            return
 
     def openChatWindow(self, peer_conn, user_receiver):
         print(peer_conn)
