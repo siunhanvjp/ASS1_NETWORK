@@ -7,6 +7,9 @@ import threading
 from datetime import datetime
 import pickle
 import time
+from tkinter.simpledialog import askstring
+from tkinter.messagebox import showinfo
+
 HOST = "127.0.0.1"
 PORT = 65200
 HEADER = 64
@@ -32,11 +35,6 @@ DELETEROOM = "removeroom"
 CONNECTROOM = "connectroom"
 LISTROOM = "listroom"
 LISTFRIEND = "listfriend"
-
-INSERT_NEW_MATCH='insert_a_match'
-UPDATE_SCORE = "upd_score"
-UPDATE_DATETIME = "upd_date_time"
-INSERT_DETAIL = "insert_detail"
 #GUI intialize
 
 def get_client_data(server):
@@ -139,7 +137,7 @@ class Chat_App(tk.Tk):
         try:
             user = curFrame.entry_user.get()
             pswd = curFrame.entry_pswd.get()
-
+            
             if user == "" or pswd == "":
                 curFrame.label_notice = "Fields cannot be empty"
                 return 
@@ -858,6 +856,10 @@ class HomePage(tk.Frame):
                     
                     window.destroy()
                     break
+                elif(msg == "#SEND#FILE#"):
+                    data.insert(tk.END, "Receiving file...")
+                    receive_file()
+                    data.insert(tk.END, "File received !!!")
                 else:
                     try:
                         data.insert(tk.END, f'{user_receiver} say: {msg}')
@@ -874,7 +876,41 @@ class HomePage(tk.Frame):
                 # except:
                     # print("close error")
                 
-                
+        def send_file():
+            name = askstring('File Name', 'What is your file name?(please include the extension)')   
+            if(name == None):
+                return
+            print(name)
+            try:
+                dir = "upload/" + name
+                file = open(dir, "rb")
+            except:
+                print("Cannot find file")
+                data.insert(tk.END, "Cannot find file")
+                return
+            data_file = file.read()
+            peer_conn.sendall("#SEND#FILE#".encode(FORMAT))
+            file_msg = {}
+            file_msg["name"] = name
+            file_msg["data_file"] = data_file
+            
+            msg = pickle.dumps(file_msg)
+            msg = bytes(f"{len(msg):<{HEADER_LENGTH}}", FORMAT) + msg
+            data.insert(tk.END, "SENDING FILE...")
+            peer_conn.send(msg)
+            data.insert(tk.END, "FILE SENT !!!")
+            file.close()
+          
+        def receive_file():
+            file_msg = get_client_data(peer_conn)  
+            name = file_msg["name"]
+            data_file = file_msg["data_file"]
+            dir = "download/" + name
+            file = open(dir, "wb+")
+            file.write(data_file)
+            file.close()
+            
+             
         window = tk.Toplevel(self)
         window.configure(bg="bisque2")
         label_title = tk.Label(window, text="\n CHAT BOX \n", font=LARGE_FONT,fg='#20639b',bg="bisque2").pack()
@@ -888,12 +924,15 @@ class HomePage(tk.Frame):
                   fg='#20639b')
         button_send = tk.Button(window,text="SEND",bg="#20639b",fg='floral white', command=inputer)
         button_back = tk.Button(window, text="QUIT",bg="#20639b",fg='floral white', command=on_closing)
-        chat_box = tk.Entry(window)  
+        chat_box = tk.Entry(window) 
+        button_send_file = tk.Button(window, text="SEND FILE",bg="#20639b",fg='floral white', command=send_file)
         label_notice = tk.Label(window, text="", bg="bisque2" )
         
         
         button_back.configure(width=10)
         button_back.pack(pady=2, side='bottom')
+        button_send_file.configure(width=10)
+        button_send_file.pack(pady=2, side= 'bottom')
         button_send.configure(width=10)
         button_send.pack(pady=2, side= 'bottom')
         label_notice.pack( side = 'bottom')

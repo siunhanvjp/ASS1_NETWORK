@@ -195,7 +195,7 @@ def findUser(id):
 def clientConn(sck, message):
 
     #connect request from sender to receiver (username)
-    
+     
     username = message["username"]
     sender = message["sender"]
     is_online =  findUser(username)
