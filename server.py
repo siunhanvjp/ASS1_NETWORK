@@ -37,10 +37,6 @@ HOSTROOM = "hostroom"
 DELETEROOM = "removeroom"
 CONNECTROOM = "connectroom"
 
-INSERT_NEW_MATCH = 'insert_a_match'
-UPDATE_SCORE = "upd_score"
-UPDATE_DATETIME = "upd_date_time"
-INSERT_DETAIL = "insert_detail"
 
 Live_Account=[] #store address, port online account
 ID=[] #store online username
@@ -189,45 +185,12 @@ def clientLogIn(sck, message):
     print("end-logIn()")
     print("")
 
-       
-def clientListMatches(sck):
-    users = Live_Account
-    
-    for user in users:
-        
-        msg = "next"
-        sck.sendall(msg.encode(FORMAT))
-        sck.recv(1024)
-        user = str(user)
-        print(user)
-        sck.sendall(user.encode(FORMAT))
-        sck.recv(1024)
-
-    
-    msg = "end"
-    sck.sendall(msg.encode(FORMAT))
-    sck.recv(1024)
-
 
 def findUser(id):
     if id in ID:
         return True
     return False
 
-
-
-def findDetails(id):
-    IDs=Get_ALL_IDs()
-    for row in IDs:
-        if row == id:
-            details=[]
-            cursor=ConnectToDB()
-            cursor.execute("select * from CT_TranDau where MaTD=? order by ThoiGian ",(id))
-            for row in cursor:
-                print(row)
-                details.append(row)
-            return details
-    return False
  
 def clientConn(sck, message):
 
@@ -419,9 +382,6 @@ def handle_client(conn, addr):
             
         elif option == SIGNUP:
             clientSignUp(conn, addr, message)
-
-        elif option == LIST:
-            clientListMatches(conn)
         
         elif option == CONNECT:
             clientConn(conn, message)
@@ -475,7 +435,7 @@ def runServer():
  
 
 # defind GUI-app class
-class SoccerNews_Admin(tk.Tk):
+class ChatApp_Admin(tk.Tk):
     def __init__(self, *args, **kwargs):
         tk.Tk.__init__(self, *args, **kwargs)
 
@@ -595,5 +555,5 @@ sThread.daemon = True
 sThread.start()
 
         
-app = SoccerNews_Admin()
+app = ChatApp_Admin()
 app.mainloop()
