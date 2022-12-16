@@ -12,9 +12,8 @@ HEADER_LENGTH = 10
 
 LARGE_FONT = ("verdana", 13,"bold")
 
-HIEU_HOSTNAME="MON-PC"
-HOST = "127.0.0.1"
-PORT = 65200
+HOST = "0.0.0.0"
+PORT = 65336
 HEADER = 64
 FORMAT = "utf8"
 DISCONNECT = "x"
@@ -568,7 +567,7 @@ class HomePage(tk.Frame):
 sThread = threading.Thread(target=runServer)
 sThread.daemon = True 
 sThread.start()
-
+print(socket.gethostname())
         
 app = ChatApp_Admin()
 app.mainloop()

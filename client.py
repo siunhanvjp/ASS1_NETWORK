@@ -11,7 +11,7 @@ from tkinter.simpledialog import askstring
 from tkinter.messagebox import showinfo
 
 HOST = "127.0.0.1"
-PORT = 65200
+PORT = 65336
 HEADER = 64
 FORMAT = "utf8"
 DISCONNECT = "x"
