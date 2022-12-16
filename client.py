@@ -50,9 +50,7 @@ def get_client_data(server):
 def send_text(sending_socket, text):
     sending_socket.sendall(bytes(text,encoding=FORMAT))
 
-
-
-        
+  
 username = []
 is_connect = []
 is_room_connect = []
