@@ -73,6 +73,7 @@ def check_delete_room():
         
             client.send(msg)
             msg = client.recv(1024).decode(FORMAT)
+            print(msg)
     except:
         print("SERVER DISCONNECTED")
 
@@ -222,8 +223,6 @@ class Chat_App(tk.Tk):
             sck.send(msg)
             accepted = sck.recv(1024).decode(FORMAT)
             
-            
-            
             if accepted == "REMOVED":
                 self.showFrame(StartPage)
         except:
@@ -277,11 +276,11 @@ class HomePage(tk.Frame):
         button_host_room = tk.Button(self, text="Host a Room",bg="#20639b",fg='#f5ea54', command=self.hostChatRoom)
 
         self.entry_search = tk.Entry(self)
-        button_search = tk.Button(self, text="Connect",bg="#20639b",fg='#f5ea54', command=self.connectChat)
+        button_connect = tk.Button(self, text="Connect",bg="#20639b",fg='#f5ea54', command=self.connectChat)
 
         label_title.pack(pady=10)
 
-        button_search.configure(width=15)
+        button_connect.configure(width=15)
         button_list.configure(width=15)
         button_back.configure(width=15)
         button_list_room.configure(width=15)
@@ -293,7 +292,7 @@ class HomePage(tk.Frame):
         self.label_notice = tk.Label(self, text="", bg="bisque2" )
         self.label_notice.pack(pady=4)
 
-        button_search.pack(pady=2)
+        button_connect.pack(pady=2)
         button_connect_room.pack(pady=2)
         button_host_room.pack(pady=2)
         button_list.pack(pady=2) 
@@ -450,11 +449,11 @@ class HomePage(tk.Frame):
             print(conn_ip)
             print(conn_port)
                 
-            client_p2p = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            room_p2p = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             server_address = (conn_ip, conn_port)
-            client_p2p.connect(server_address)
-            client_p2p.sendall(username[0].encode(FORMAT)) #register name with room
-            self.openChatRoomWindow(client_p2p, id)
+            room_p2p.connect(server_address)
+            room_p2p.sendall(username[0].encode(FORMAT)) #register name with room
+            self.openChatRoomWindow(room_p2p, id)
         
     
     def openChatRoomWindow(self, room_conn, room_name):
@@ -480,11 +479,15 @@ class HomePage(tk.Frame):
                     print(msg)
                 except:
                     print("END#CON1")
-                if(msg == "CLOSE#ROOM"):
-                    data.insert(tk.END, "ROOM SHUTDOWN!!!")
-                    room_conn.close()
-                    time.sleep(0.5)
-                    window.destroy()
+                try:
+                    if(msg == "CLOSE#ROOM"):
+                        is_room_connect.remove(room_name)
+                        data.insert(tk.END, "ROOM SHUTDOWN!!!")
+                        room_conn.close()
+                        time.sleep(0.5)
+                        window.destroy()
+                        break
+                except:
                     break
                 else:
                     try:
@@ -557,8 +560,7 @@ class HomePage(tk.Frame):
         if option == CHAT:
             self.connect1v1(conn, message)
             
-        elif option == CHATROOM:
-            self.connectChatRoom(conn, message) #add later 
+
 
     def runListenServer(self):
         try:
@@ -648,6 +650,7 @@ class HomePage(tk.Frame):
                     print(msg)
                 except:
                     print("END#CON 1")
+                    break
                     
                 if(msg == "END#CON"):
                     broadcast_msg(f'{sender} Disconnected', "SYSTEM")

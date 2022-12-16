@@ -265,10 +265,10 @@ def removeRoom(sck, message):
     username = message["username"]
     
     if not any(item["username"] == username for item in room):
-        sck.sendall("ROOM#REMOVED".encode(FORMAT))
+        sck.sendall("ROOM#DONT#EXIST".encode(FORMAT))
     else:
         room[:] = [d for d in room if d.get('username') != username]
-        sck.sendall("ROOM#REMOVEDS".encode(FORMAT))
+        sck.sendall("ROOM#REMOVED".encode(FORMAT))
 
 
 def connectRoom(sck, message):
@@ -310,46 +310,61 @@ def connectRoom(sck, message):
         sck.send(msg)
     
 def showRoom(sck, message):
-    room_list = []
-    for item in room:
-        room_list.append(item["username"])
+    try:
+        room_list = []
+        for item in room:
+            room_list.append(item["username"])
+            
+        response = {}
+        response["reply"] = "oke"
+        response["room_online"] = room_list
         
-    response = {}
-    response["reply"] = "oke"
-    response["room_online"] = room_list
-    
-    msg = pickle.dumps(response)
-    msg = bytes(f"{len(msg):<{HEADER_LENGTH}}", FORMAT) + msg
-    sck.send(msg)
+        msg = pickle.dumps(response)
+        msg = bytes(f"{len(msg):<{HEADER_LENGTH}}", FORMAT) + msg
+        sck.send(msg)
+    except:
+        response = {}
+        response["reply"] = "fail"
+        
+        msg = pickle.dumps(response)
+        msg = bytes(f"{len(msg):<{HEADER_LENGTH}}", FORMAT) + msg
+        sck.send(msg)
     
 def showFriend(sck, message):
-    
-    user = message["username"]
-    friend_list = []
-    db, cursor=ConnectToDB()
-    cursor.execute("select user_friend from friend_list where username=(%s) ",(user, ))
-    for row in cursor:
-        parse=str(row)
-        parse_check =parse[2:]
-        parse= parse_check.find("'")
-        res= parse_check[:parse]
-        friend_list.append(res)
-    print(friend_list)
-    online_friend_list = []
-    
-    for friend in friend_list:
-        if friend in Live_Account:
-            online_friend_list.append(friend)
-    
-    print(online_friend_list)
-    
-    response = {}
-    response["reply"] = "oke"
-    response["friend_online"] = online_friend_list
-    
-    msg = pickle.dumps(response)
-    msg = bytes(f"{len(msg):<{HEADER_LENGTH}}", FORMAT) + msg
-    sck.send(msg)
+    try:
+        user = message["username"]
+        friend_list = []
+        db, cursor=ConnectToDB()
+        cursor.execute("select user_friend from friend_list where username=(%s) ",(user, ))
+        for row in cursor:
+            parse=str(row)
+            parse_check =parse[2:]
+            parse= parse_check.find("'")
+            res= parse_check[:parse]
+            friend_list.append(res)
+        print(friend_list)
+        online_friend_list = []
+        
+        for friend in friend_list:
+            if friend in Live_Account:
+                online_friend_list.append(friend)
+        
+        print(online_friend_list)
+        
+        response = {}
+        response["reply"] = "oke"
+        response["friend_online"] = online_friend_list
+        
+        msg = pickle.dumps(response)
+        msg = bytes(f"{len(msg):<{HEADER_LENGTH}}", FORMAT) + msg
+        sck.send(msg)
+    except:
+        response = {}
+        response["reply"] = "fail"
+        
+        msg = pickle.dumps(response)
+        msg = bytes(f"{len(msg):<{HEADER_LENGTH}}", FORMAT) + msg
+        sck.send(msg)
     
 # Specify this function before interpreting
 def ConnectToDB():
