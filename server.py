@@ -12,7 +12,7 @@ HEADER_LENGTH = 10
 
 LARGE_FONT = ("verdana", 13,"bold")
 
-HOST = "0.0.0.0"
+HOST = "127.0.0.1"
 PORT = 65336
 HEADER = 64
 FORMAT = "utf8"

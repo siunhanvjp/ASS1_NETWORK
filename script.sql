@@ -10,7 +10,7 @@ CREATE TABLE `user` (
   `conn_ip` varchar(20) DEFAULT NULL,
   `conn_port` varchar(22) DEFAULT NULL,
   PRIMARY KEY (`username`)
-)
+);
 
 DROP TABLE IF EXISTS `friend_list`;
 CREATE TABLE `friend_list` (
@@ -20,7 +20,6 @@ CREATE TABLE `friend_list` (
   KEY `FK_friend` (`user_friend`),
   CONSTRAINT `FK_friend` FOREIGN KEY (`user_friend`) REFERENCES `user` (`username`) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT `FK_user` FOREIGN KEY (`username`) REFERENCES `user` (`username`) ON DELETE CASCADE ON UPDATE CASCADE
-)
-
+);
 
 INSERT INTO `user` VALUES ('a','123','192.168.1.10','65528'),('admi','123',NULL,NULL),('b','123','192.168.1.10','65526'),('c','123','192.168.1.10','64533'),('d','123','192.168.1.10','49397');
