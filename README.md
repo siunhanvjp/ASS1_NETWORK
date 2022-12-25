@@ -15,3 +15,7 @@ Username: admin
 Password: server
 
 run client.py
+
+put the file that you want to send to other user in the Upload folder
+
+The file that other user send to you will be saved in the Download folder
